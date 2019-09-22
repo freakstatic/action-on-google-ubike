@@ -4,7 +4,7 @@ This project consists in a firebase cloud functions that is used in the Google A
 I created this Action on Google to avoid using the Ubike App, since I had to login every freaking time...
 
 ## Usage
-In the future you will probably find this Action on Google on the Google Assistant "marketplace" (I'm working on that) <br />
+In the future you will probably find this Action on Google on the Google Assistant "marketplace" (I'm working on that). <br />
 You just have to say `Hi Google, talk to mister ubike`, setup your IPL account and bike number and then you can use
 the Google Action by just saying `unlock my bike`
 
