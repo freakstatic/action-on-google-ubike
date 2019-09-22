@@ -10,7 +10,7 @@ the Google Action by just saying `unlock my bike`
 
 ### Structure
 Inside the `functions` folder you can find the following files: <br />
-The `IPLController.js` which is responsible of handling the authentication with the IPL Login Page (some scraping magic here 😁) <br />   
+The `IPLController.js` which is responsible of handling the authentication with the IPL Login Page (some scraping magic here 😁)   
 The `UbikeController.js` which handles the authentication with the Ubike API and the bike unlocking process. <br />
 
 ### Deployment
