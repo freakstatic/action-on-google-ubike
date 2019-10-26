@@ -1,11 +1,11 @@
 # Action on Google - Ubike
 
-This project consists in a firebase cloud functions that is used in the Google Action called `Mister Ubike`. <br />
+This project consists in a firebase cloud functions that is used in the Google Action called `master Ubike`. <br />
 I created this Action on Google to avoid using the Ubike App, since I had to login every freaking time...
 
 ## Usage
 In the future you will probably find this Action on Google on the Google Assistant "marketplace" (I'm working on that). <br />
-You just have to say `Hi Google, talk to mister ubike`, setup your IPL account and bike number and then you can use
+You just have to say `Hi Google, talk to master ubike`, setup your IPL account and bike number and then you can use
 the Google Action by just saying `unlock my bike`
 
 ### Structure
