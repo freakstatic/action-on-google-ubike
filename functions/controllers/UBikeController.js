@@ -1,15 +1,19 @@
 const req = require('request').defaults({jar: true});
 
+const API_URL = 'http://api.ubike.ipleiria.pt/cxf/';
+
 class UBikeController {
 
-    constructor(){
+
+    constructor() {
+
     }
 
 
     authenticate(urlWithAccessToken) {
         return new Promise((resolve, reject) => {
             req.post({
-                url: 'http://api.ubike.ipleiria.pt/cxf/sm/auth',
+                url: API_URL + 'sm/auth',
                 json: {
                     authType: "IPL",
                     result: urlWithAccessToken
@@ -29,7 +33,7 @@ class UBikeController {
     unlockUbike(ubikeNumber) {
         return new Promise((resolve, reject) => {
             req.put({
-                url: 'http://api.ubike.ipleiria.pt/cxf/rm/routes/' + ubikeNumber,
+                url: API_URL + 'rm/routes/' + ubikeNumber,
                 headers: {
                     "be-token": this.authenticationToken
                 }
@@ -48,7 +52,7 @@ class UBikeController {
     }
 
     async iAuthenticationTokenValid(ubikeNumber) {
-        if (!this.authenticationToken){
+        if (!this.authenticationToken) {
             return false;
         }
 
@@ -59,7 +63,7 @@ class UBikeController {
                     "be-token": this.authenticationToken
                 }
             }, (error, response, body) => {
-                if (error){
+                if (error) {
                     resolve(false);
                     return;
                 }
@@ -67,6 +71,22 @@ class UBikeController {
                 resolve(response.statusCode === 200);
             });
 
+        });
+    }
+
+    static getAuthProvider() {
+        return new Promise((resolve, reject) => {
+            req.get({
+                url: API_URL + 'cm/settings/gsAuthProvider',
+                json: true
+            }, function (e, r, body) {
+                if (e || !body) {
+                    reject('Failed to get the auth provider');
+                    return;
+                }
+
+                resolve(body);
+            });
         });
     }
 

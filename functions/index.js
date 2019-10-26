@@ -8,10 +8,9 @@ const ConversationSentences = require('./ConversationSentences.js');
 const {dialogflow, Suggestions} = require('actions-on-google');
 const functions = require('firebase-functions');
 
-const app = dialogflow({debug: true});
+const app = dialogflow({debug: false});
 
 app.intent('unlock', async (conv) => {
-
     if (!conv.user.storage.email || !conv.user.storage.password) {
         conv.ask(ConversationSentences.NEED_TO_SETUP_ACCOUNT_FIRST);
         conv.ask(new Suggestions([ConversationSentences.SUGGESTION_SETUP]));
@@ -25,7 +24,6 @@ app.intent('unlock', async (conv) => {
     }
 
     try {
-
         let ubikeController = new UBikeController();
         await ubikeController.setAuthenticationToken(conv.user.storage.authenticationToken);
 
@@ -33,7 +31,7 @@ app.intent('unlock', async (conv) => {
             try {
                 conv.user.storage.authenticationToken = await ubikeController.authenticate(conv.user.storage.urlWithAccessToken);
             } catch (e) {
-                conv.user.storage.urlWithAccessToken = await new IPLController().getUrlWithAccessToken(conv.user.storage.email, conv.user.storage.password);
+                conv.user.storage.urlWithAccessToken = await new IPLController().computeUrlWithAccessToken(conv.user.storage.email, conv.user.storage.password);
             }
 
             conv.user.storage.authenticationToken = await ubikeController.authenticate(conv.user.storage.urlWithAccessToken);
@@ -46,6 +44,9 @@ app.intent('unlock', async (conv) => {
         console.error(e);
         conv.ask(e);
         conv.ask(ConversationSentences.GLITCH_FOUND);
+
+        delete conv.user.storage.authenticationToken;
+        delete conv.user.storage.urlWithAccessToken;
     }
 });
 
@@ -104,6 +105,10 @@ app.catch((conv, error) => {
             ConversationSentences.SUGGESTION_UNLOCK_BIKE
         ]
     ));
+
+    delete conv.user.storage.authenticationToken;
+    delete conv.user.storage.urlWithAccessToken;
+
 });
 
 app.fallback((conv) => {

@@ -1,54 +1,84 @@
 const req = require('request').defaults({jar: true});
 const cheerio = require('cheerio');
-const url = require('url');
+const UBikeController = require('./UBikeController.js');
 
 class IPLController {
 
-    async getLoginUrl() {
-        let authProvider = await IPLController.getAuthProvider();
-        let authUrl = authProvider.properties.value[1].url.value;
-        let formAction = await IPLController.getAuthFormAction(authUrl);
-        return "https://login.ipleiria.pt" + formAction;
+    async computeUrlWithAccessToken(email, password) {
+        let authData = await this.computeAuthData();
+        await this.computeMsisSTokens();
+        let samlResponse = await this.computeSamlResponse(email, password);
+        return await this.makeRequestOfUrlWithAccessToken(samlResponse, authData.relayState);
     }
 
-    static getAuthFormAction(authUrl) {
+    async computeAuthData() {
+        let authProvider = await UBikeController.getAuthProvider();
+        let authUrl = authProvider.properties.value[1].url.value;
+        let authData = await IPLController.getAuthFormData(authUrl);
+        await IPLController.getTokens(authData);
+        return authData;
+    }
+
+    static getAuthFormData(authUrl) {
         return new Promise((resolve, reject) => {
             req.get({
                 url: authUrl
-            }, function (e, r, body) {
-                if (e || !body){
-                    reject('Failed to get auth form action');
+            }, function (error, response, body) {
+                if (error || !body || response.statusCode !== 200) {
+                    reject('Failed to get IPL auth form data');
                     return;
                 }
-
                 const $ = cheerio.load(body);
-                resolve($('form').attr('action') + "&RedirectToIdentityProvider=http://login.ipleiria.pt/adfs/services/trust");
-            });
-        });
-
-    }
-
-    static getAuthProvider() {
-        return new Promise((resolve, reject) => {
-            req.get({
-                url: 'http://api.ubike.ipleiria.pt/cxf/cm/settings/gsAuthProvider',
-                json: true
-            }, function (e, r, body) {
-                if (e || !body){
-                    reject('Failed to get the auth provider');
-                    return;
-                }
-
-                resolve(body);
+                let $form = $('form');
+                resolve({
+                    url: $form.attr('action'),
+                    relayState: $form.find('input[name="RelayState"]').val(),
+                    samlRequest: $form.find('input[name="SAMLRequest"]').val()
+                });
             });
         });
     }
 
-
-    getSamlResponse(loginUrl, email, password) {
+    static getTokens(authData) {
         return new Promise((resolve, reject) => {
             req.post({
-                    url: loginUrl,
+                    url: 'https://login.ipleiria.pt/adfs/ls',
+                    form: {
+                        SAMLRequest: authData.samlRequest,
+                        RelayState: authData.relayState
+                    },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    followAllRedirects: true
+                },
+                function (error, response, body) {
+                    if (error || !body || !response.headers['set-cookie'] || response.statusCode !== 200) {
+                        reject('Failed to get SAML cookies');
+                        return;
+                    }
+
+                    let cookies = response.headers['set-cookie'];
+
+                    if (!cookies){
+                        reject(errorMessage);
+                        return;
+                    }
+
+                    let msiSamlRequest = cookies[0].split(';')[0];
+                    let msiSSamlRequest1 = cookies[1].split(';')[0];
+                    resolve({
+                        msiSamlRequest: msiSamlRequest,
+                        msiSSamlRequest1: msiSSamlRequest1
+                    });
+                });
+        });
+    }
+
+    computeSamlResponse(email, password) {
+        return new Promise((resolve, reject) => {
+            req.post({
+                    url: 'https://login.ipleiria.pt/adfs/ls?RedirectToIdentityProvider=http%3a%2f%2flogin.ipleiria.pt%2fadfs%2fservices%2ftrust',
                     form: {
                         UserName: email,
                         Password: password,
@@ -59,8 +89,8 @@ class IPLController {
                     },
                     followAllRedirects: true
                 },
-                function (e, r, body) {
-                    if (e || !body) {
+                function (e, response, body) {
+                    if (e || !body || response.statusCode !== 200) {
                         reject('Failed to get SAML response');
                         return;
                     }
@@ -72,17 +102,38 @@ class IPLController {
         });
     }
 
-    async getUrlWithAccessToken(email, password) {
-        let loginUrl = await this.getLoginUrl();
-        let relayState = await IPLController.getRelayStateFromLoginUrl(loginUrl);
-        let samlResponse = await this.getSamlResponse(loginUrl, email, password);
-
+    makeRequestOfUrlWithAccessToken(samlResponse, relayState){
         return new Promise((resolve, reject) => {
             req.post({
-                url: 'https://identity.ipleiria.pt/commonauth',
+                    url: 'https://km.apim.ipleiria.pt/commonauth',
+                    form: {
+                        SAMLResponse: samlResponse,
+                        RelayState: relayState
+                    },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    followAllRedirects: true,
+                    maxRedirects: 3
+                },
+                function (error, request, body) {
+                    if (error && !this.headers.referer) {
+                        reject('Failed to get SAML response');
+                        return;
+                    }
+
+                    resolve(this.headers.referer);
+                });
+        });
+    }
+
+    async computeMsisSTokens() {
+        return new Promise((resolve, reject) => {
+            req.post({
+                url: 'https://login.ipleiria.pt/adfs/ls',
                 form: {
-                    SAMLResponse: samlResponse,
-                    RelayState: relayState
+                    HomeRealmSelection: 'http://login.ipleiria.pt/adfs/services/trust',
+                    Email: ''
                 },
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -94,15 +145,12 @@ class IPLController {
                     return;
                 }
 
-                resolve(this.href);
+                resolve();
             });
         });
     }
 
-    static getRelayStateFromLoginUrl(loginUrl) {
-        let queryData = url.parse(loginUrl, true).query;
-        return queryData.RelayState;
-    }
+
 
 }
 
